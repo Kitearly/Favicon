@@ -208,15 +208,32 @@ ico:last 命中 → 立刻返回旧图 + 后台异步刷新 ─→ 返回       
 npm install
 npx wrangler login
 npm run kv:create    # 创建 KV namespace，并把真实 id 写进 wrangler.jsonc
+npm run deploy
 ```
 
-然后：
+`wrangler login` 会给一个 URL，在本地浏览器完成授权（服务器 / SSH 环境同样适用）。
+
+### 部署后验证
 
 ```bash
-npm run dev      # 本地开发服务器
-npm test         # 单元测试 + 集成测试
-npm run deploy   # 发布
+curl -sD - -o favicon.png "https://favicon-api.<你的子域>.workers.dev/?url=https://github.com"
 ```
+
+| 看什么 | 期望 |
+|:--|:--|
+| `content-type` | 真实图片类型（魔数嗅探过的） |
+| `x-favicon-cache` | 第一次 `MISS`，紧接着再请求是 `FRESH` |
+| `cf-cache-status` | 边缘层出现 `HIT`；edge 副本过期（10–60 分钟）后会先再现一次 `MISS` |
+
+### 排查
+
+- **`cf-cache-status` 一直是 `MISS`** —— Workers Cache 没有介入（个别账号/版本组合
+  不生效）。把 `WORKERS_CACHE` 改成 `"0"` 再 deploy：Worker 行为完全不变，只是没了
+  边缘那一层。
+- **403 `REFERER_NOT_ALLOWED`** —— 检查 `HOSTS`；服务端脚本调用要配
+  `ALLOW_EMPTY_REFERER=1`。
+- **KV 一直空** —— 带 `wrangler tail` 看实时日志，多半是目标站点出网被墙或超时预算
+  耗尽，`x-favicon-reason` 里会写明原因。
 
 ## 配置
 
@@ -284,4 +301,6 @@ npm test
 
 ## License
 
-MIT
+MIT。`entities.ts`（HTML 实体解码）等少数模块移植自
+[site-info-api](https://github.com/xaoxuu/site-info-api)，按其 MIT 许可保留
+`Copyright (c) 2022 Mr. X` 的版权声明；其余为本项目重写。
