@@ -1,0 +1,76 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "favicon-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  // enable_ctx_exports 自 2025-11-17 起已默认开启 —— 显式写在这里，
+  // 是为了哪怕有人日后把 compatibility_date 往回拨，ctx.exports 也不会默默失效。
+  "compatibility_flags": ["nodejs_compat", "enable_ctx_exports"],
+  "observability": {
+    "enabled": true
+  },
+
+  // Workers Cache：网关不缓存，被缓存的那一层才进缓存。
+  //
+  // 缓存键由「入口 + 路径/查询串 + Worker 版本」组成，不含 Referer / Origin。
+  // 所以调用方白名单必须放在不缓存的网关入口里 —— 否则未授权的调用方能直接
+  // 拿到缓存图，合法的 403 也会被缓存下来发给所有人。
+  "cache": {
+    "enabled": true
+  },
+  "exports": {
+    "default": {
+      "type": "worker",
+      "cache": { "enabled": false }
+    },
+    "Favicon": {
+      "type": "worker",
+      "cache": { "enabled": true }
+    }
+  },
+
+  // Replace the placeholder id with the one printed by:
+  //   npx wrangler kv namespace create FAVICON_KV
+  "kv_namespaces": [
+    {
+      "binding": "FAVICON_KV",
+      "id": "0000000000000000000000000000000f"
+    }
+  ],
+
+  "vars": {
+    // Referer hosts that may use the API. Empty means "no restriction".
+    // Set it to your own domain to lock the API down.
+    "HOSTS": "",
+
+    // Set to "1" to allow requests without a Referer header.
+    "ALLOW_EMPTY_REFERER": "0",
+
+    // Set to "1" to allow fetching private and loopback addresses.
+    "ALLOW_PRIVATE_HOSTS": "0",
+
+    // Ports that may be used, comma separated. "*" allows any port.
+    "ALLOWED_PORTS": "80,443",
+
+    // Maximum number of redirects that are followed.
+    "MAX_REDIRECTS": "5",
+
+    // Edge cache TTL applied to KV reads; also bounds propagation delay.
+    "KV_EDGE_TTL_SECONDS": "3600",
+
+    // Largest icon payload we are willing to store / serve.
+    "MAX_ICON_BYTES": "262144",
+
+    // Largest HTML document we are willing to parse.
+    "MAX_HTML_BYTES": "2097152",
+
+    // Total budget for one resolution.
+    "FETCH_TIMEOUT_MS": "8000",
+
+    // Set to "1" to route the gateway through the `ctx.exports` loopback so
+    // that Workers Cache serves hot icons without running this Worker at all.
+    // If Cf-Cache-Status stays MISS on your account, flip it to "0": the
+    // Worker then does the same work in-process, just without the edge layer.
+    "WORKERS_CACHE": "1"
+  }
+}

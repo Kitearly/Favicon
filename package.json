@@ -1,0 +1,30 @@
+{
+  "name": "site-info-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fetch site title, description and icons by URL — running on Cloudflare Workers.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "kv:create": "wrangler kv namespace create FAVICON_KV --binding FAVICON_KV --update-config",
+    "kv:gc": "node scripts/kv-gc.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.5",
+    "@cloudflare/workers-types": "^5.20261019.1",
+    "@msw/cloudflare": "^0.2.0",
+    "msw": "^3.0.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.151.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "msw@2.15.0": true,
+    "workerd@1.20261019.1": true
+  }
+}
