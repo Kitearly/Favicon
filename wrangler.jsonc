@@ -6,6 +6,10 @@
   // ctx.exports（网关 → 缓存入口的 loopback）要求 compatibility_date ≥ 2025-11-17，
   // 从那个日期起 enable_ctx_exports 已默认开启，不必再显式列出。
   "compatibility_flags": ["nodejs_compat"],
+
+  // 不暴露 *.workers.dev，只能用自定义域名 / 路由访问。
+  "workers_dev": false,
+
   "observability": {
     "enabled": true
   },
@@ -29,8 +33,7 @@
     }
   },
 
-  // Replace the placeholder id with the one printed by:
-  //   npx wrangler kv namespace create FAVICON_KV
+  // 由 `npm run kv:create` 写入。
   "kv_namespaces": [
     {
       "binding": "FAVICON_KV",

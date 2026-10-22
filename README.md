@@ -4,7 +4,7 @@
 `<img>`、`<link rel="icon">` 或者后端图片代理。
 
 ```
-GET https://<你的-worker>.workers.dev/?url=https://github.com
+GET https://<你的域名>/?url=https://github.com
 ```
 
 ## 它怎么找到图标的
@@ -223,10 +223,19 @@ npm run deploy
 
 `wrangler login` 会给一个 URL，在本地浏览器完成授权（服务器 / SSH 环境同样适用）。
 
+**自定义域名。** `wrangler.jsonc` 里 `workers_dev` 是关掉的，Worker 只能用自定义域名
+访问。把域名加进 `routes`，再跑一次 `npm run deploy`：
+
+```jsonc
+"routes": [
+  { "pattern": "favicon.example.com", "custom_domain": true }
+]
+```
+
 ### 部署后验证
 
 ```bash
-curl -sD - -o favicon.png "https://favicon-api.<你的子域>.workers.dev/?url=https://github.com"
+curl -sD - -o favicon.png "https://favicon.example.com/?url=https://github.com"
 ```
 
 | 看什么 | 期望 |
