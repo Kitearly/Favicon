@@ -225,6 +225,9 @@ const dnsMemo = new Map<string, { expires: number; ok: boolean; reason: string }
 /** DNS 解析结果的缓存时长（毫秒）。 */
 const DNS_MEMO_TTL_MS = 60_000;
 
+/** 解析结果缓存最多保留的域名数（最旧的先淘汰）。 */
+const DNS_MEMO_MAX = 1_000;
+
 /**
  * 单次 DNS 查询的超时（毫秒）。
  *
@@ -277,6 +280,11 @@ export async function assertPublicHost(
 
   const ok = reason === "";
   dnsMemo.set(host, { expires: Date.now() + DNS_MEMO_TTL_MS, ok, reason });
+  // 上限只是防御：一个 isolate 长期服务大量随机域名时，缓存不该无限变大。
+  if (dnsMemo.size > DNS_MEMO_MAX) {
+    const oldest = dnsMemo.keys().next().value;
+    if (oldest !== undefined) dnsMemo.delete(oldest);
+  }
   return ok ? { ok: true } : { ok: false, reason };
 }
 

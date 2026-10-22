@@ -2,13 +2,17 @@
 /**
  * Garbage collect the favicon KV namespace.
  *
- * The Worker keeps one entry per site for up to 30 days, so the namespace
- * grows over time. This script lists the keys of a prefix and deletes the
- * ones that are old enough.
+ * `ico:now` expires on its own, but `ico:last` never does, so the namespace
+ * grows with every site that has ever been asked for. This script lists the
+ * keys of a prefix and deletes the ones the Worker stamped as old enough
+ * (the write time lives in the KV metadata as `at`).
  *
- *   npm run kv:gc -- --prefix fav:v1: --older-than 30d --delete
+ *   npm run kv:gc -- --prefix ico:last: --older-than 30d --delete
  *
  * Without `--delete` the script only reports what it would remove.
+ *
+ * Note: `wrangler kv key list` returns at most 1000 keys per call. When the
+ * report says 1000 keys, run it again until it lists fewer.
  */
 
 import { execFileSync } from "node:child_process";

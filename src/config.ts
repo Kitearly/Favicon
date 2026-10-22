@@ -52,7 +52,7 @@ function parseHosts(value: string | undefined): string[] {
   if (!value) return [...DEFAULTS.hosts];
   return value
     .split(",")
-    .map((part) => part.trim())
+    .map((part) => part.trim().toLowerCase())
     .filter((part) => part !== "");
 }
 

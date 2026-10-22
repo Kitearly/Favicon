@@ -76,7 +76,7 @@ curl -o favicon.png "https://favicon.example/?url=https://github.com"
 
 ## 缓存分层
 
-一个请求要穿过三层，每层各自挡掉一部分流量:
+一个请求要穿过三层，每层各自挡掉一部分流量：
 
 ```
   GET /?url=…
@@ -118,6 +118,15 @@ Worker 版本」组成，**不含 Referer / Origin**。如果把白名单校验�
 - Worker 版本默认也是键的一部分：每次部署边缘缓存清空，图标还在 KV 里，
   **不会**引发回源风暴。
 
+**几个细节：**
+
+- 生成的字母方块在边缘只放 **60 秒**：它只是临时产物，`fail:` 负缓存已经在更大
+  的时间尺度上护住上游，没必要让它按普通图标的时长待在边缘、推迟站点恢复后的真图标。
+- 边缘 `HIT` 时，`cf-cache-status` 是当次的结果，而 `x-favicon-cache` 反映的是
+  **填充那一刻**的状态（Worker 没有跑，头是随响应一起缓存的）。
+- 计费按请求算：**命中记 1 次**；未命中时网关的 loopback 调用也算一次
+  worker-to-worker 请求，所以一次冷请求记 2 次（CPU 只有真正执行的那次计费）。
+
 **要开吗？** `WORKERS_CACHE=1`（默认）时网关走 `ctx.exports` 的 loopback 转发，
 Workers Cache 才有机会介入。部署后看一眼 `cf-cache-status` 响应头：出现
 `HIT` 说明边缘层已接住热流量；如果一直是 `MISS`（个别账号/版本组合
@@ -145,7 +154,7 @@ Workers Cache 才有机会介入。部署后看一眼 `cf-cache-status` 响应�
 **Metadata** 放图标之外的信息：
 
 ```json
-{ "ct": "image/svg+xml", "src": "html",
+{ "ct": "image/svg+xml", "src": "html", "at": 1761000000000,
   "url": "https://developer.mozilla.org/favicon.svg" }
 ```
 
@@ -154,6 +163,7 @@ Workers Cache 才有机会介入。部署后看一眼 `cf-cache-status` 响应�
 | `ct` | 魔数嗅探出的真实内容类型 |
 | `src` | 来源：`html` / `favicon.ico` / `ddg` / `google` / `generated` |
 | `url` | 图标字节实际从哪个绝对地址取到的 |
+| `at` | 写入时间（毫秒时间戳）。`ico:last` 永不过期，清理脚本靠它判断年龄 |
 
 `fail:<host>` 存的是失败原因（一段文本），同样是 30 分钟 TTL。
 
@@ -273,12 +283,13 @@ npx wrangler kv key list --namespace-id <id> --prefix ico:last:
   "metadata": {
     "ct": "image/svg+xml",
     "src": "html",
+    "at": 1761000000000,
     "url": "https://developer.mozilla.org/favicon.svg"
   }
 }
 ```
 
-清理脚本：
+清理脚本按 metadata 里的 `at` 判断年龄：
 
 ```bash
 npm run kv:gc -- --prefix ico:last: --older-than 30d          # 只报告
@@ -286,8 +297,9 @@ npm run kv:gc -- --prefix ico:last: --older-than 30d --delete  # 真删
 npm run kv:gc -- --local --older-than 30d                      # 本地开发数据
 ```
 
-注意 `wrangler kv key list` 和 `wrangler kv key delete` 都是计费操作，所以脚本默认只报告，
-加了 `--delete` 才动手。
+`wrangler kv key list` 每次最多返回 1000 个键；报告里恰好是 1000 个就再跑一次，
+直到列出的数量变少为止。`wrangler kv key list` 和 `wrangler kv key delete` 都是
+计费操作，所以脚本默认只报告，加了 `--delete` 才动手。
 
 ## 测试
 

@@ -22,6 +22,9 @@ export function errorResponse(
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
+      // Workers Cache 对没有 Cache-Control 的响应会套用启发式新鲜度，
+      // 错误绝不能被缓存。
+      "cache-control": "no-store",
       ...CORS_HEADERS,
     },
   });

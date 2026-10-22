@@ -59,26 +59,34 @@ export default {
     const size = parseSize(requestUrl.searchParams.get("size"));
     const refresh = isRefresh(requestUrl.searchParams.get("refresh"));
 
-    const internalRequest = new Request(
-      buildInternalUrl(target.origin, size, refresh).toString(),
-      request,
-    );
+    const inner = buildInternalUrl(target.origin, size, refresh);
+
+    // 内部请求**不带调用方的任何请求头**，方法也固定为 GET：
+    // - 调用方带的 Authorization 会让 Workers Cache 自动 bypass；
+    // - x-forwarded-* / x-http-method-override 这类头会进入缓存键，被打散；
+    // - HEAD 冷缓存时也能存下完整字节，随后 GET 直接命中。
+    const internalRequest = new Request(inner.toString(), { method: "GET" });
 
     // WORKERS_CACHE=1 时走 `ctx.exports` 的 loopback 转发，Workers Cache 才有机会
-    // 在这一层接管条目；转发初始化里的 `cf.cacheKey` 与内部 URL 自身的
-    // 路径/查询串一致，两者给的是同一个键。
-    //
-    // 其他情况（如本地测试无法注入环境变量的入口）退回进程内直接调用：
-    // 逻辑与响应完全一样，只是没有边缘缓存这一层。
+    // 在这一层接管条目；`cf.cacheKey` 与内部 URL 自身的路径/查询串一致，
+    // 两者给的是同一个键。其他情况（本地测试无法注入 env、或账号上边缘层不生效）
+    // 退回进程内直接调用：逻辑与响应完全一样，只是没有边缘缓存这一层。
     if (config.workersCache) {
       const binding = ctx.exports?.Favicon;
       if (binding) {
-        return binding.fetch(internalRequest, {
-          cf: { cacheKey: `${new URL(internalRequest.url).pathname}${new URL(internalRequest.url).search}` },
+        const response = await binding.fetch(internalRequest, {
+          cf: { cacheKey: inner.pathname + inner.search },
         });
+        return stripBodyForHead(request, response);
       }
     }
 
-    return new Favicon(ctx, env).fetch(internalRequest);
+    return stripBodyForHead(request, await new Favicon(ctx, env).fetch(internalRequest));
   },
 };
+
+/** HEAD 只需要响应头；内部拉的是完整 GET。 */
+function stripBodyForHead(request: Request, response: Response): Response {
+  if (request.method !== "HEAD") return response;
+  return new Response(null, { status: response.status, headers: response.headers });
+}

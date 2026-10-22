@@ -159,10 +159,14 @@ export async function writeIcon(
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
 
+  // 写入时间由这里盖章。`ico:last` 永不过期，没法靠 TTL 回收，
+  // 清理脚本只能依赖 metadata 里的时间戳。
+  const metadata = { ...meta, at: meta.at ?? Date.now() };
+
   const options =
     ttlSeconds === null
-      ? { metadata: meta }
-      : { metadata: meta, expirationTtl: Math.max(60, Math.floor(ttlSeconds)) };
+      ? { metadata }
+      : { metadata, expirationTtl: Math.max(60, Math.floor(ttlSeconds)) };
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {

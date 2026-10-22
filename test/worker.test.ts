@@ -90,6 +90,8 @@ describe("parameter handling", () => {
   it("rejects a request without a target", async () => {
     const response = await call(makeEnv(), null);
     expect(response.status).toBe(400);
+    // Errors must never be cached, not even by heuristic freshness.
+    expect(response.headers.get("cache-control")).toBe("no-store");
     const body = (await response.json()) as { error: { code: string } };
     expect(body.error.code).toBe("INVALID_URL");
   });
@@ -204,6 +206,20 @@ describe("caller allow list", () => {
     expect(response.status).toBe(200);
   });
 
+  it("normalises the configured hosts to lower case", async () => {
+    const ctx = createExecutionContext();
+    const response = await worker.fetch(
+      new Request("https://worker.test/?url=https%3A%2F%2Freferer.test%2F", {
+        headers: { origin: "https://allowed.test" },
+      }),
+      makeEnv({ HOSTS: "Allowed.Test" }),
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+
+    expect(response.status).toBe(200);
+  });
+
   it("honours an explicit *. wildcard", async () => {
     const ctx = createExecutionContext();
     const response = await worker.fetch(
@@ -269,6 +285,14 @@ describe("resolving a favicon", () => {
     expect(now?.meta.src).toBe("html");
     expect(last?.bytes).toEqual(PNG_BYTES);
     expect(last?.meta).toEqual(now?.meta);
+
+    // 清理脚本靠写入时间判断 `ico:last` 的年龄。
+    const raw = await workerEnv.FAVICON_KV.getWithMetadata(kvKeyLast("bothkeys.test"), {
+      type: "arrayBuffer",
+    });
+    const at = (raw.metadata as { at?: number } | null)?.at;
+    expect(typeof at).toBe("number");
+    expect(at).toBeGreaterThan(Date.now() - 60_000);
   });
 
   it("falls back to /favicon.ico when the page declares nothing", async () => {
@@ -296,6 +320,11 @@ describe("resolving a favicon", () => {
     expect(response.headers.get("content-type")).toBe("image/svg+xml");
     expect(response.headers.get("x-favicon-source")).toBe("generated");
     expect(response.headers.get("x-favicon-cache")).toBe("FALLBACK");
+    // The placeholder is only a stopgap: keep it out of the edge cache quickly.
+    const maxAge = Number(
+      /max-age=(\d+)/.exec(response.headers.get("cache-control") ?? "")?.[1] ?? "-1",
+    );
+    expect(maxAge).toBeLessThanOrEqual(60);
     const body = await response.text();
     expect(body).toContain("<svg");
     expect(body).toContain("N");

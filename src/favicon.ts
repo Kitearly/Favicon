@@ -49,6 +49,14 @@ const EDGE_MAX = 3_600;
 /** 边缘上源站报错时，继续用旧副本的窗口（秒）。 */
 const STALE_IF_ERROR = 86_400;
 
+/**
+ * 生成的字母方块在边缘只放 60 秒。
+ *
+ * 它是「什么都没有」时的临时产物，而 `fail:` 负缓存已经护住上游 30 分钟；
+ * 让它按普通图标的 10~60 分钟待在边缘，只会推迟站点恢复后拿到真图标的时间。
+ */
+const FALLBACK_MAX_AGE = 60;
+
 export class Favicon extends WorkerEntrypoint<Env> {
   override async fetch(request: Request): Promise<Response> {
     const { env, ctx } = this;
@@ -187,8 +195,10 @@ async function storeIcon(
   bytes: Uint8Array,
   meta: FaviconMeta,
 ): Promise<void> {
-  await writeIcon(env, lastKey, bytes, meta, null);
-  await writeIcon(env, nowKey, bytes, meta, randomNowTtlSeconds());
+  // 两个键共用同一个时间戳，元数据才能保持一致。
+  const stamped: FaviconMeta = { ...meta, at: meta.at ?? Date.now() };
+  await writeIcon(env, lastKey, bytes, stamped, null);
+  await writeIcon(env, nowKey, bytes, stamped, randomNowTtlSeconds());
 }
 
 /**
@@ -231,6 +241,7 @@ async function refreshInBackground(
     ct: resolved.contentType,
     src: resolved.source,
     url: resolved.finalUrl,
+    at: Date.now(),
   };
 
   await writeIcon(env, lastKey, resolved.bytes, meta, null);
@@ -250,7 +261,9 @@ function imageResponse(
     "content-type": icon.meta.ct,
     "cache-control": refresh
       ? "no-store"
-      : `public, max-age=${edgeMaxAge()}, stale-if-error=${STALE_IF_ERROR}`,
+      : `public, max-age=${
+          state === "FALLBACK" ? FALLBACK_MAX_AGE : edgeMaxAge()
+        }, stale-if-error=${STALE_IF_ERROR}`,
     "cache-tag": `ico, ico:${host}`,
     "x-favicon-source": icon.meta.src,
     "x-favicon-final-url": icon.meta.url,

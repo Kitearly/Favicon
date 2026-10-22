@@ -52,6 +52,13 @@ export interface FaviconMeta {
   src: FaviconSource;
   /** Absolute URL the payload was fetched from. */
   url: string;
+  /**
+   * Write time (ms since epoch), stamped by the Worker.
+   *
+   * `ico:last` never expires, so it cannot be garbage collected by TTL and
+   * the cleanup script needs this to tell old entries from new ones.
+   */
+  at?: number;
 }
 
 /** An icon that may be fetched. */

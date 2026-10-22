@@ -3,9 +3,9 @@
   "name": "favicon-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
-  // enable_ctx_exports 自 2025-11-17 起已默认开启 —— 显式写在这里，
-  // 是为了哪怕有人日后把 compatibility_date 往回拨，ctx.exports 也不会默默失效。
-  "compatibility_flags": ["nodejs_compat", "enable_ctx_exports"],
+  // ctx.exports（网关 → 缓存入口的 loopback）要求 compatibility_date ≥ 2025-11-17，
+  // 从那个日期起 enable_ctx_exports 已默认开启，不必再显式列出。
+  "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true
   },

@@ -1,9 +1,9 @@
 {
-  "name": "site-info-api",
+  "name": "favicon-api",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Fetch site title, description and icons by URL — running on Cloudflare Workers.",
+  "description": "Return a site's favicon as raw image bytes — running on Cloudflare Workers.",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
